@@ -22,6 +22,26 @@ body {
   top: 0;
 }
 
+/* 普通 button */
+#testButtons button {
+  margin: 5px;
+  padding: 10px 20px;
+  font-size: 18px;
+  border: none;
+  border-radius: 8px;
+  background: #4CAF50;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+/* ⭐ 當前 Test（凹效果） */
+#testButtons button.active {
+  background: #2e7d32;
+  box-shadow: inset 0 4px 8px rgba(0,0,0,0.4);
+  transform: translateY(2px);
+}
+
 button {
   margin: 5px;
   padding: 10px 20px;
@@ -69,46 +89,36 @@ let currentWord = "";
 let attempts = 0;
 let selectedVoiceName = "Daniel";
 
-// 🔔 正確音（叮噹）
+// 🔔 正確音
 function playCorrectSound() {
   let ctx = new AudioContext();
   let o = ctx.createOscillator();
   let g = ctx.createGain();
 
-  o.type = "sine";
-  o.frequency.setValueAtTime(880, ctx.currentTime); // 高音
+  o.frequency.setValueAtTime(880, ctx.currentTime);
+  g.gain.setValueAtTime(0.5, ctx.currentTime);
 
-  // 音量包絡（叮一聲）
-  g.gain.setValueAtTime(0, ctx.currentTime);
-  g.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.01);
-  g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+  o.connect(g);
+  g.connect(ctx.destination);
+
+  o.start();
+  o.stop(ctx.currentTime + 0.3);
+}
+
+// 🔻 錯誤音
+function playWrongSound() {
+  let ctx = new AudioContext();
+  let o = ctx.createOscillator();
+  let g = ctx.createGain();
+
+  o.frequency.setValueAtTime(150, ctx.currentTime);
+  g.gain.setValueAtTime(0.6, ctx.currentTime);
 
   o.connect(g);
   g.connect(ctx.destination);
 
   o.start();
   o.stop(ctx.currentTime + 0.4);
-}
-
-// 🔻 錯誤音（dum）
-function playWrongSound() {
-  let ctx = new AudioContext();
-  let o = ctx.createOscillator();
-  let g = ctx.createGain();
-
-  o.type = "sine";
-  o.frequency.setValueAtTime(150, ctx.currentTime); // 低音
-
-  // dum 效果（快起慢跌）
-  g.gain.setValueAtTime(0, ctx.currentTime);
-  g.gain.linearRampToValueAtTime(0.6, ctx.currentTime + 0.02);
-  g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
-
-  o.connect(g);
-  g.connect(ctx.destination);
-
-  o.start();
-  o.stop(ctx.currentTime + 0.5);
 }
 
 // Load vocab
@@ -138,14 +148,24 @@ function createTestButtons() {
   tests.forEach((t,i) => {
     let b = document.createElement("button");
     b.textContent = "Test " + (i+1);
+
     b.onclick = () => startTest(i);
+
     c.appendChild(b);
   });
 }
 
+// ⭐ 修正：切換 active 狀態
 function startTest(i) {
   currentTest = i;
   currentIndex = 0;
+
+  // 👉 更新 button 狀態
+  document.querySelectorAll("#testButtons button")
+    .forEach((btn, index) => {
+      btn.classList.toggle("active", index === i);
+    });
+
   loadWord();
 }
 
@@ -171,7 +191,7 @@ function createInputs() {
     };
 
     input.oninput = () => {
-      input.value = input.value.slice(-1); // 覆蓋輸入
+      input.value = input.value.slice(-1);
       handleInput(i);
     };
 
@@ -213,12 +233,11 @@ function checkAnswer(word) {
   if (word.toLowerCase() === currentWord.toLowerCase()) {
     inputs.forEach(i => i.classList.add("correct"));
     document.getElementById("result").textContent = "✔ Correct";
-    playCorrectSound(); // 🔔
-
+    playCorrectSound();
   } else {
     attempts++;
     inputs.forEach(i => i.classList.add("wrong"));
-    playWrongSound(); // 🔻
+    playWrongSound();
 
     if (attempts >= 3) {
       document.getElementById("result").textContent =
@@ -258,8 +277,8 @@ function playSound() {
   let v = voices.find(v => v.name.includes(selectedVoiceName));
 
   if (v) utter.voice = v;
-  utter.lang = "en-GB";
 
+  utter.lang = "en-GB";
   speechSynthesis.cancel();
   speechSynthesis.speak(utter);
 }
