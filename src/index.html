@@ -5,64 +5,39 @@
 <title>Vocabulary Trainer</title>
 
 <style>
-  body {
-    font-family: Arial, sans-serif;
-    text-align: center;
-    margin: 0;
-    background: #f5f7fb;
-  }
+body {
+  font-family: Arial;
+  text-align: center;
+  background: #f5f7fb;
+  margin: 0;
+}
 
-  h1 { margin: 20px 0; }
+#testButtons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  background: #fff;
+  padding: 10px;
+  position: sticky;
+  top: 0;
+}
 
-  /* Test buttons（長存） */
-  #testButtons {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    padding: 10px;
-    background: #fff;
-    position: sticky;
-    top: 0;
-  }
+button {
+  margin: 5px;
+  padding: 10px 20px;
+  font-size: 18px;
+}
 
-  #testButtons button {
-    margin: 5px;
-    padding: 10px 20px;
-    font-size: 18px;
-    border-radius: 8px;
-    border: none;
-    background: #4CAF50;
-    color: white;
-    cursor: pointer;
-  }
+.box {
+  width: 50px;
+  height: 60px;
+  font-size: 32px;
+  text-align: center;
+  margin: 5px;
+}
 
-  #testButtons button.active {
-    background: #2e7d32;
-  }
-
-  .controls button, select {
-    margin: 10px;
-    padding: 12px 20px;
-    font-size: 18px;
-  }
-
-  .controls button {
-    background: #2196F3;
-    color: white;
-    border: none;
-  }
-
-  /* 每個字母一格 */
-  .box {
-    width: 50px;
-    height: 60px;
-    margin: 6px;
-    font-size: 32px;
-    text-align: center;
-  }
-
-  .correct { border: 2px solid green; }
-  .wrong { border: 2px solid red; }
+.correct { border: 2px solid green; }
+.wrong { border: 2px solid red; }
 </style>
 </head>
 
@@ -72,12 +47,11 @@
 
 <div id="testButtons"></div>
 
-<div class="controls">
+<div>
   <button onclick="prevWord()">⬅</button>
   <button onclick="nextWord()">➡</button>
   <button onclick="playSound()">🔊 Replay</button>
 
-  <!-- Voice 選擇（只限 Daniel / Samantha） -->
   <select id="voiceSelect">
     <option value="Daniel">Daniel (UK)</option>
     <option value="Samantha">Samantha (US)</option>
@@ -85,7 +59,6 @@
 </div>
 
 <div id="inputs"></div>
-
 <p id="result"></p>
 
 <script>
@@ -94,18 +67,57 @@ let currentTest = 0;
 let currentIndex = 0;
 let currentWord = "";
 let attempts = 0;
-let selectedVoiceName = "Daniel"; // 預設 Daniel
+let selectedVoiceName = "Daniel";
 
-// 🔽 載入 vocab.txt
+// 🔔 正確音（叮噹）
+function playCorrectSound() {
+  let ctx = new AudioContext();
+  let o = ctx.createOscillator();
+  let g = ctx.createGain();
+
+  o.type = "sine";
+  o.frequency.setValueAtTime(880, ctx.currentTime); // 高音
+
+  // 音量包絡（叮一聲）
+  g.gain.setValueAtTime(0, ctx.currentTime);
+  g.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+
+  o.connect(g);
+  g.connect(ctx.destination);
+
+  o.start();
+  o.stop(ctx.currentTime + 0.4);
+}
+
+// 🔻 錯誤音（dum）
+function playWrongSound() {
+  let ctx = new AudioContext();
+  let o = ctx.createOscillator();
+  let g = ctx.createGain();
+
+  o.type = "sine";
+  o.frequency.setValueAtTime(150, ctx.currentTime); // 低音
+
+  // dum 效果（快起慢跌）
+  g.gain.setValueAtTime(0, ctx.currentTime);
+  g.gain.linearRampToValueAtTime(0.6, ctx.currentTime + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+
+  o.connect(g);
+  g.connect(ctx.destination);
+
+  o.start();
+  o.stop(ctx.currentTime + 0.5);
+}
+
+// Load vocab
 fetch('vocab.txt')
-.then(res => res.text())
+.then(r => r.text())
 .then(text => {
-
-  let lines = text.split("\n");
   let temp = [];
 
-  // 👉 將 === 分成唔同 Test
-  lines.forEach(line => {
+  text.split("\n").forEach(line => {
     if (line.trim() === "===") {
       tests.push(temp);
       temp = [];
@@ -120,115 +132,98 @@ fetch('vocab.txt')
   startTest(0);
 });
 
-// 🔘 建立 Test 按鈕
 function createTestButtons() {
-  let container = document.getElementById("testButtons");
+  let c = document.getElementById("testButtons");
 
-  tests.forEach((t, i) => {
-    let btn = document.createElement("button");
-    btn.textContent = "Test " + (i + 1);
-
-    // 👉 click 切換 Test
-    btn.onclick = () => startTest(i);
-
-    container.appendChild(btn);
+  tests.forEach((t,i) => {
+    let b = document.createElement("button");
+    b.textContent = "Test " + (i+1);
+    b.onclick = () => startTest(i);
+    c.appendChild(b);
   });
 }
 
-// ▶️ 開始 Test
-function startTest(index) {
-  currentTest = index;
+function startTest(i) {
+  currentTest = i;
   currentIndex = 0;
-
-  // 👉 高亮目前 Test
-  document.querySelectorAll("#testButtons button")
-    .forEach((b, i) => {
-      b.classList.toggle("active", i === index);
-    });
-
   loadWord();
 }
 
-// 🔄 載入單字
 function loadWord() {
   attempts = 0;
   document.getElementById("result").textContent = "";
-
   currentWord = tests[currentTest][currentIndex];
-
   createInputs();
   playSound();
 }
 
-// ⬜ 建立輸入格
 function createInputs() {
-  let container = document.getElementById("inputs");
-  container.innerHTML = "";
+  let c = document.getElementById("inputs");
+  c.innerHTML = "";
 
-  for (let i = 0; i < currentWord.length; i++) {
+  for (let i=0;i<currentWord.length;i++) {
     let input = document.createElement("input");
-
-    input.maxLength = 1; // 👉 每格只可輸入 1 個字
+    input.maxLength = 1;
     input.className = "box";
 
-    input.oninput = () => handleInput(i);
+    input.onfocus = function() {
+      setTimeout(() => this.select(), 0);
+    };
 
-    // 👉 Backspace 返回上一格
+    input.oninput = () => {
+      input.value = input.value.slice(-1); // 覆蓋輸入
+      handleInput(i);
+    };
+
     input.onkeydown = (e) => {
       if (e.key === "Backspace" && !input.value && i > 0) {
-        container.children[i - 1].focus();
+        c.children[i-1].focus();
       }
     };
 
-    container.appendChild(input);
+    c.appendChild(input);
   }
 
-  container.children[0].focus();
+  c.children[0].focus();
 }
 
-// ⌨️ 處理輸入
 function handleInput(index) {
   let inputs = document.querySelectorAll(".box");
 
-  // 👉 自動跳下一格
   if (inputs[index].value && index < inputs.length - 1) {
-    inputs[index + 1].focus();
+    inputs[index+1].focus();
   }
 
   let word = "";
-  let allFilled = true;
+  let full = true;
 
-  // 👉 組合用戶輸入
   inputs.forEach(i => {
-    if (i.value === "") allFilled = false;
+    if (!i.value) full = false;
     word += i.value;
   });
 
-  // 👉 全部填滿就即時判斷
-  if (allFilled) checkAnswer(word);
+  if (full) checkAnswer(word);
 }
 
-// ✔️ 檢查答案
 function checkAnswer(word) {
   let inputs = document.querySelectorAll(".box");
 
-  inputs.forEach(i => i.disabled = true); // 👉 防止再修改
+  inputs.forEach(i => i.disabled = true);
 
   if (word.toLowerCase() === currentWord.toLowerCase()) {
-
     inputs.forEach(i => i.classList.add("correct"));
     document.getElementById("result").textContent = "✔ Correct";
+    playCorrectSound(); // 🔔
 
   } else {
     attempts++;
-
     inputs.forEach(i => i.classList.add("wrong"));
+    playWrongSound(); // 🔻
 
     if (attempts >= 3) {
       document.getElementById("result").textContent =
         "Answer: " + currentWord;
     } else {
-      // 👉 清空再試
       setTimeout(() => {
         inputs.forEach(i => {
           i.value = "";
@@ -241,7 +236,6 @@ function checkAnswer(word) {
   }
 }
 
-// ⬅➡ 導航
 function nextWord() {
   if (currentIndex < tests[currentTest].length - 1) {
     currentIndex++;
@@ -258,24 +252,18 @@ function prevWord() {
   }
 }
 
-// 🔊 播音
 function playSound() {
   let utter = new SpeechSynthesisUtterance(currentWord);
-
   let voices = speechSynthesis.getVoices();
+  let v = voices.find(v => v.name.includes(selectedVoiceName));
 
-  // 👉 根據選擇找 voice
-  let voice = voices.find(v => v.name.includes(selectedVoiceName));
-
-  if (voice) utter.voice = voice;
-
+  if (v) utter.voice = v;
   utter.lang = "en-GB";
 
   speechSynthesis.cancel();
   speechSynthesis.speak(utter);
 }
 
-// 👉 監聽 voice 選擇
 document.getElementById("voiceSelect").onchange = function() {
   selectedVoiceName = this.value;
 };
