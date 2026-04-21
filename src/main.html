@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Vocabulary Trainer</title>
+
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    margin: 0;
+    background: #f5f7fb;
+  }
+
+  h1 { margin: 20px 0; }
+
+  /* Test buttons（長存） */
+  #testButtons {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 10px;
+    background: #fff;
+    position: sticky;
+    top: 0;
+  }
+
+  #testButtons button {
+    margin: 5px;
+    padding: 10px 20px;
+    font-size: 18px;
+    border-radius: 8px;
+    border: none;
+    background: #4CAF50;
+    color: white;
+    cursor: pointer;
+  }
+
+  #testButtons button.active {
+    background: #2e7d32;
+  }
+
+  .controls button, select {
+    margin: 10px;
+    padding: 12px 20px;
+    font-size: 18px;
+  }
+
+  .controls button {
+    background: #2196F3;
+    color: white;
+    border: none;
+  }
+
+  /* 每個字母一格 */
+  .box {
+    width: 50px;
+    height: 60px;
+    margin: 6px;
+    font-size: 32px;
+    text-align: center;
+  }
+
+  .correct { border: 2px solid green; }
+  .wrong { border: 2px solid red; }
+</style>
+</head>
+
+<body>
+
+<h1>Vocabulary Trainer</h1>
+
+<div id="testButtons"></div>
+
+<div class="controls">
+  <button onclick="prevWord()">⬅</button>
+  <button onclick="nextWord()">➡</button>
+  <button onclick="playSound()">🔊 Replay</button>
+
+  <!-- Voice 選擇（只限 Daniel / Samantha） -->
+  <select id="voiceSelect">
+    <option value="Daniel">Daniel (UK)</option>
+    <option value="Samantha">Samantha (US)</option>
+  </select>
+</div>
+
+<div id="inputs"></div>
+
+<p id="result"></p>
+
+<script>
+let tests = [];
+let currentTest = 0;
+let currentIndex = 0;
+let currentWord = "";
+let attempts = 0;
+let selectedVoiceName = "Daniel"; // 預設 Daniel
+
+// 🔽 載入 vocab.txt
+fetch('vocab.txt')
+.then(res => res.text())
+.then(text => {
+
+  let lines = text.split("\n");
+  let temp = [];
+
+  // 👉 將 === 分成唔同 Test
+  lines.forEach(line => {
+    if (line.trim() === "===") {
+      tests.push(temp);
+      temp = [];
+    } else {
+      temp.push(line.trim());
+    }
+  });
+
+  if (temp.length) tests.push(temp);
+
+  createTestButtons();
+  startTest(0);
+});
+
+// 🔘 建立 Test 按鈕
+function createTestButtons() {
+  let container = document.getElementById("testButtons");
+
+  tests.forEach((t, i) => {
+    let btn = document.createElement("button");
+    btn.textContent = "Test " + (i + 1);
+
+    // 👉 click 切換 Test
+    btn.onclick = () => startTest(i);
+
+    container.appendChild(btn);
+  });
+}
+
+// ▶️ 開始 Test
+function startTest(index) {
+  currentTest = index;
+  currentIndex = 0;
+
+  // 👉 高亮目前 Test
+  document.querySelectorAll("#testButtons button")
+    .forEach((b, i) => {
+      b.classList.toggle("active", i === index);
+    });
+
+  loadWord();
+}
+
+// 🔄 載入單字
+function loadWord() {
+  attempts = 0;
+  document.getElementById("result").textContent = "";
+
+  currentWord = tests[currentTest][currentIndex];
+
+  createInputs();
+  playSound();
+}
+
+// ⬜ 建立輸入格
+function createInputs() {
+  let container = document.getElementById("inputs");
+  container.innerHTML = "";
+
+  for (let i = 0; i < currentWord.length; i++) {
+    let input = document.createElement("input");
+
+    input.maxLength = 1; // 👉 每格只可輸入 1 個字
+    input.className = "box";
+
+    input.oninput = () => handleInput(i);
+
+    // 👉 Backspace 返回上一格
+    input.onkeydown = (e) => {
+      if (e.key === "Backspace" && !input.value && i > 0) {
+        container.children[i - 1].focus();
+      }
+    };
+
+    container.appendChild(input);
+  }
+
+  container.children[0].focus();
+}
+
+// ⌨️ 處理輸入
+function handleInput(index) {
+  let inputs = document.querySelectorAll(".box");
+
+  // 👉 自動跳下一格
+  if (inputs[index].value && index < inputs.length - 1) {
+    inputs[index + 1].focus();
+  }
+
+  let word = "";
+  let allFilled = true;
+
+  // 👉 組合用戶輸入
+  inputs.forEach(i => {
+    if (i.value === "") allFilled = false;
+    word += i.value;
+  });
+
+  // 👉 全部填滿就即時判斷
+  if (allFilled) checkAnswer(word);
+}
+
+// ✔️ 檢查答案
+function checkAnswer(word) {
+  let inputs = document.querySelectorAll(".box");
+
+  inputs.forEach(i => i.disabled = true); // 👉 防止再修改
+
+  if (word.toLowerCase() === currentWord.toLowerCase()) {
+
+    inputs.forEach(i => i.classList.add("correct"));
+    document.getElementById("result").textContent = "✔ Correct";
+
+  } else {
+    attempts++;
+
+    inputs.forEach(i => i.classList.add("wrong"));
+
+    if (attempts >= 3) {
+      document.getElementById("result").textContent =
+        "Answer: " + currentWord;
+    } else {
+      // 👉 清空再試
+      setTimeout(() => {
+        inputs.forEach(i => {
+          i.value = "";
+          i.classList.remove("wrong");
+          i.disabled = false;
+        });
+        inputs[0].focus();
+      }, 800);
+    }
+  }
+}
+
+// ⬅➡ 導航
+function nextWord() {
+  if (currentIndex < tests[currentTest].length - 1) {
+    currentIndex++;
+    loadWord();
+  } else {
+    document.getElementById("result").textContent = "END";
+  }
+}
+
+function prevWord() {
+  if (currentIndex > 0) {
+    currentIndex--;
+    loadWord();
+  }
+}
+
+// 🔊 播音
+function playSound() {
+  let utter = new SpeechSynthesisUtterance(currentWord);
+
+  let voices = speechSynthesis.getVoices();
+
+  // 👉 根據選擇找 voice
+  let voice = voices.find(v => v.name.includes(selectedVoiceName));
+
+  if (voice) utter.voice = voice;
+
+  utter.lang = "en-GB";
+
+  speechSynthesis.cancel();
+  speechSynthesis.speak(utter);
+}
+
+// 👉 監聽 voice 選擇
+document.getElementById("voiceSelect").onchange = function() {
+  selectedVoiceName = this.value;
+};
+</script>
+
+</body>
+</html>
