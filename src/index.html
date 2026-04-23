@@ -78,6 +78,7 @@ button {
   </select>
 </div>
 
+<h2 id="questionNumber"></h2>
 <div id="inputs"></div>
 <p id="result"></p>
 
@@ -172,7 +173,13 @@ function startTest(i) {
 function loadWord() {
   attempts = 0;
   document.getElementById("result").textContent = "";
+
   currentWord = tests[currentTest][currentIndex];
+
+  // ⭐ 加呢行（顯示第幾題）
+  document.getElementById("questionNumber").textContent =
+    (currentIndex + 1) + ".";
+
   createInputs();
   playSound();
 }
