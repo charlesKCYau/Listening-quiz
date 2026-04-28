@@ -42,6 +42,10 @@ body {
   transform: translateY(2px);
 }
 
+#answerList {
+  color: blue;
+}
+
 button {
   margin: 5px;
   padding: 10px 20px;
@@ -81,6 +85,7 @@ button {
 <h2 id="questionNumber"></h2>
 <div id="inputs"></div>
 <p id="result"></p>
+<div id="answerList"></div>
 
 <script>
 let tests = [];
@@ -161,7 +166,8 @@ function startTest(i) {
   currentTest = i;
   currentIndex = 0;
 
-  // 👉 更新 button 狀態
+  document.getElementById("answerList").innerHTML = ""; // ⭐ 清空舊答案
+
   document.querySelectorAll("#testButtons button")
     .forEach((btn, index) => {
       btn.classList.toggle("active", index === i);
@@ -262,12 +268,24 @@ function checkAnswer(word) {
   }
 }
 
+function showAnswers() {
+  let container = document.getElementById("answerList");
+  container.innerHTML = "<h3>Answers:</h3>";
+
+  tests[currentTest].forEach((word, index) => {
+    let div = document.createElement("div");
+    div.textContent = (index + 1) + ". " + word;
+    container.appendChild(div);
+  });
+}
+
 function nextWord() {
   if (currentIndex < tests[currentTest].length - 1) {
     currentIndex++;
     loadWord();
   } else {
     document.getElementById("result").textContent = "END";
+    showAnswers(); // ⭐ 加呢行
   }
 }
 
